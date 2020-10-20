@@ -24,7 +24,7 @@ public class TestCommandLineApp {
         CommandLine cmd = parser.parse(CommandLineApp.buildOptions(), args);
 
         StringBuilder stringBuilder = new StringBuilder();
-        new CommandLineApp(stringBuilder, cmd).extractTables(cmd);
+        new CommandLineApp(stringBuilder, cmd,"Test").extractTables(cmd);
 
         return stringBuilder.toString();
     }

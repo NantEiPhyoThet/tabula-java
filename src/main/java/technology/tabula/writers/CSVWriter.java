@@ -8,6 +8,7 @@ import java.util.List;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVFormat;
 
+import technology.restservice.Controller;
 import technology.tabula.RectangularTextContainer;
 import technology.tabula.Table;
 
@@ -31,12 +32,17 @@ public class CSVWriter implements Writer {
 	@Override
 	public void write(Appendable out, List<Table> tables) throws IOException {
 		try (CSVPrinter printer = new CSVPrinter(out, format)) {
+			String result = "";
 			for (Table table : tables) {
 				for (List<RectangularTextContainer> row : table.getRows()) {
 					List<String> cells = new ArrayList<>(row.size());
-					for (RectangularTextContainer<?> tc : row) cells.add(tc.getText());
+					for (RectangularTextContainer<?> tc : row)
+						cells.add(tc.getText());
 					printer.printRecord(cells);
+					result = result.concat(cells.toString());
 				}
+				// System.out.println("From csv writer write" + result);
+				new Controller().setResult(result);
 			}
 			printer.flush();
 		}

@@ -26,7 +26,6 @@ import technology.tabula.writers.JSONWriter;
 import technology.tabula.writers.TSVWriter;
 import technology.tabula.writers.Writer;
 
-
 public class CommandLineApp {
 
     private static String VERSION = "1.0.5";
@@ -35,7 +34,6 @@ public class CommandLineApp {
 
     private static final int RELATIVE_AREA_CALCULATION_MODE = 0;
     private static final int ABSOLUTE_AREA_CALCULATION_MODE = 1;
-
 
     private Appendable defaultOutput;
 
@@ -46,14 +44,15 @@ public class CommandLineApp {
     private TableExtractor tableExtractor;
     private List<Float> verticalRulingPositions;
 
-    public CommandLineApp(Appendable defaultOutput, CommandLine line) throws ParseException {
+    public CommandLineApp(Appendable defaultOutput, CommandLine line, String area) throws ParseException {
         this.defaultOutput = defaultOutput;
-        this.pageAreas = CommandLineApp.whichAreas(line);
+        this.pageAreas = CommandLineApp.whichAreas(area);
         this.pages = CommandLineApp.whichPages(line);
         this.outputFormat = CommandLineApp.whichOutputFormat(line);
         this.tableExtractor = CommandLineApp.createExtractor(line);
 
         if (line.hasOption('s')) {
+            System.err.println("HAS PASSWORD OPTION");
             this.password = line.getOptionValue('s');
         }
         if (line.hasOption('c')) {
@@ -78,7 +77,7 @@ public class CommandLineApp {
                 System.exit(0);
             }
 
-            new CommandLineApp(System.out, line).extractTables(line);
+            new CommandLineApp(System.out, line, "temp").extractTables(line);
         } catch (ParseException exp) {
             System.err.println("Error: " + exp.getMessage());
             System.exit(1);
@@ -104,8 +103,13 @@ public class CommandLineApp {
             throw new ParseException("Need exactly one filename\nTry --help for help");
         }
 
-        File pdfFile = new File(line.getArgs()[0]);
-        if (!pdfFile.exists()) {
+        String pdfFileParam = line.getArgs()[0].split("\\s+")[1];
+        // File pdfFile = new File(line.getArgs()[0]);
+        File pdfFile = new File(pdfFileParam);
+        // System.out.println("CHECKING LINE ARGS" + pdfFileParam);
+        File pdfFile1 = new File("src/test/resources/technology/tabula/twotables.pdf");
+        // System.out.println("Getting file from args"+pdfFile1.getName());
+        if (!pdfFile1.exists()) {
             throw new ParseException("File does not exist");
         }
         extractFileTables(line, pdfFile);
@@ -158,30 +162,37 @@ public class CommandLineApp {
     private void extractFile(File pdfFile, Appendable outFile) throws ParseException {
         PDDocument pdfDocument = null;
         try {
+            System.out.println("Inside extract file" + pdfFile.getName());
             pdfDocument = this.password == null ? PDDocument.load(pdfFile) : PDDocument.load(pdfFile, this.password);
             PageIterator pageIterator = getPageIterator(pdfDocument);
             List<Table> tables = new ArrayList<>();
 
             while (pageIterator.hasNext()) {
+                System.out.println("Inside page iterator while loop");
+
                 Page page = pageIterator.next();
 
                 if (verticalRulingPositions != null) {
-                    for (Float verticalRulingPosition: verticalRulingPositions) {
+                    for (Float verticalRulingPosition : verticalRulingPositions) {
                         page.addRuling(new Ruling(0, verticalRulingPosition, 0.0f, (float) page.getHeight()));
                     }
                 }
 
                 if (pageAreas != null) {
+                    // System.out.println("Page area is NOT null");
                     for (Pair<Integer, Rectangle> areaPair : pageAreas) {
                         Rectangle area = areaPair.getRight();
                         if (areaPair.getLeft() == RELATIVE_AREA_CALCULATION_MODE) {
-                            area  = new Rectangle((float) (area.getTop() / 100 * page.getHeight()),
-                                    (float) (area.getLeft() / 100 * page.getWidth()), (float) (area.getWidth() / 100 * page.getWidth()),
+                            // System.out.println("From get left RELATIVE_AREA_CALCULATION_MODE");
+                            area = new Rectangle((float) (area.getTop() / 100 * page.getHeight()),
+                                    (float) (area.getLeft() / 100 * page.getWidth()),
+                                    (float) (area.getWidth() / 100 * page.getWidth()),
                                     (float) (area.getHeight() / 100 * page.getHeight()));
                         }
                         tables.addAll(tableExtractor.extractTables(page.getArea(area)));
                     }
                 } else {
+                    System.out.println("Page area is null");
                     tables.addAll(tableExtractor.extractTables(page));
                 }
             }
@@ -201,9 +212,7 @@ public class CommandLineApp {
 
     private PageIterator getPageIterator(PDDocument pdfDocument) throws IOException {
         ObjectExtractor extractor = new ObjectExtractor(pdfDocument);
-        return (pages == null) ?
-                extractor.extract() :
-                extractor.extract(pages);
+        return (pages == null) ? extractor.extract() : extractor.extract(pages);
     }
 
     // CommandLine parsing methods
@@ -214,35 +223,40 @@ public class CommandLineApp {
         }
 
         try {
-            return OutputFormat.valueOf(line.getOptionValue('f'));
+            // return OutputFormat.valueOf(line.getOptionValue('f'));
+            return OutputFormat.CSV;
         } catch (IllegalArgumentException e) {
-            throw new ParseException(String.format(
-                    "format %s is illegal. Available formats: %s",
-                    line.getOptionValue('f'),
-                    Utils.join(",", OutputFormat.formatNames())));
+            throw new ParseException(String.format("format %s is illegal. Available formats: %s",
+                    line.getOptionValue('f'), Utils.join(",", OutputFormat.formatNames())));
         }
     }
 
-    private static List<Pair<Integer, Rectangle>> whichAreas(CommandLine line) throws ParseException {
-        if (!line.hasOption('a')) {
-            return null;
-        }
+    private static List<Pair<Integer, Rectangle>> whichAreas(String line) throws ParseException {
+        // System.out.println("Inside which area has the option a");
+        // if (!line.hasOption("a")) {
+        // System.out.println("no option a");
+        // return null;
+        // }
 
-        String[] optionValues = line.getOptionValues('a');
+        String[] optionValues = new String[] { line };
+        // String[] optionValues = line.getOptionValues('a');
 
         List<Pair<Integer, Rectangle>> areaList = new ArrayList<Pair<Integer, Rectangle>>();
-        for (String optionValue: optionValues) {
+        for (String optionValue : optionValues) {
             int areaCalculationMode = ABSOLUTE_AREA_CALCULATION_MODE;
             int startIndex = 0;
             if (optionValue.startsWith("%")) {
+                System.out.println("Option value starts with %");
                 startIndex = 1;
                 areaCalculationMode = RELATIVE_AREA_CALCULATION_MODE;
             }
             List<Float> f = parseFloatList(optionValue.substring(startIndex));
+
             if (f.size() != 4) {
                 throw new ParseException("area parameters must be top,left,bottom,right optionally preceded by %");
             }
-            areaList.add(new Pair<Integer, Rectangle>(areaCalculationMode, new Rectangle(f.get(0), f.get(1), f.get(3) - f.get(1), f.get(2) - f.get(0))));
+            areaList.add(new Pair<Integer, Rectangle>(areaCalculationMode,
+                    new Rectangle(f.get(0), f.get(1), f.get(3) - f.get(1), f.get(2) - f.get(0))));
         }
         return areaList;
     }
@@ -258,7 +272,8 @@ public class CommandLineApp {
             return ExtractionMethod.SPREADSHEET;
         }
 
-        // -n/--no-spreadsheet [deprecated; use -t] or  -c/--columns or -g/--guess or -t/--stream
+        // -n/--no-spreadsheet [deprecated; use -t] or -c/--columns or -g/--guess or
+        // -t/--stream
         if (line.hasOption('n') || line.hasOption('c') || line.hasOption('t')) {
             return ExtractionMethod.BASIC;
         }
@@ -309,60 +324,41 @@ public class CommandLineApp {
         o.addOption("v", "version", false, "Print version and exit.");
         o.addOption("h", "help", false, "Print this help text.");
         o.addOption("g", "guess", false, "Guess the portion of the page to analyze per page.");
-        o.addOption("r", "spreadsheet", false, "[Deprecated in favor of -l/--lattice] Force PDF to be extracted using spreadsheet-style extraction (if there are ruling lines separating each cell, as in a PDF of an Excel spreadsheet)");
-        o.addOption("n", "no-spreadsheet", false, "[Deprecated in favor of -t/--stream] Force PDF not to be extracted using spreadsheet-style extraction (if there are no ruling lines separating each cell)");
-        o.addOption("l", "lattice", false, "Force PDF to be extracted using lattice-mode extraction (if there are ruling lines separating each cell, as in a PDF of an Excel spreadsheet)");
-        o.addOption("t", "stream", false, "Force PDF to be extracted using stream-mode extraction (if there are no ruling lines separating each cell)");
+        o.addOption("r", "spreadsheet", false,
+                "[Deprecated in favor of -l/--lattice] Force PDF to be extracted using spreadsheet-style extraction (if there are ruling lines separating each cell, as in a PDF of an Excel spreadsheet)");
+        o.addOption("n", "no-spreadsheet", false,
+                "[Deprecated in favor of -t/--stream] Force PDF not to be extracted using spreadsheet-style extraction (if there are no ruling lines separating each cell)");
+        o.addOption("l", "lattice", false,
+                "Force PDF to be extracted using lattice-mode extraction (if there are ruling lines separating each cell, as in a PDF of an Excel spreadsheet)");
+        o.addOption("t", "stream", false,
+                "Force PDF to be extracted using stream-mode extraction (if there are no ruling lines separating each cell)");
         o.addOption("i", "silent", false, "Suppress all stderr output.");
         o.addOption("u", "use-line-returns", false, "Use embedded line returns in cells. (Only in spreadsheet mode.)");
-        // o.addOption("d", "debug", false, "Print detected table areas instead of processing.");
-        o.addOption(Option.builder("b")
-                .longOpt("batch")
-                .desc("Convert all .pdfs in the provided directory.")
-                .hasArg()
-                .argName("DIRECTORY")
-                .build());
-        o.addOption(Option.builder("o")
-                .longOpt("outfile")
-                .desc("Write output to <file> instead of STDOUT. Default: -")
-                .hasArg()
-                .argName("OUTFILE")
-                .build());
-        o.addOption(Option.builder("f")
-                .longOpt("format")
-                .desc("Output format: (" + Utils.join(",", OutputFormat.formatNames()) + "). Default: CSV")
-                .hasArg()
-                .argName("FORMAT")
-                .build());
-        o.addOption(Option.builder("s")
-                .longOpt("password")
-                .desc("Password to decrypt document. Default is empty")
-                .hasArg()
-                .argName("PASSWORD")
-                .build());
-        o.addOption(Option.builder("c")
-                .longOpt("columns")
+        // o.addOption("d", "debug", false, "Print detected table areas instead of
+        // processing.");
+        o.addOption(Option.builder("b").longOpt("batch").desc("Convert all .pdfs in the provided directory.").hasArg()
+                .argName("DIRECTORY").build());
+        o.addOption(Option.builder("o").longOpt("outfile").desc("Write output to <file> instead of STDOUT. Default: -")
+                .hasArg().argName("OUTFILE").build());
+        o.addOption(Option.builder("f").longOpt("format")
+                .desc("Output format: (" + Utils.join(",", OutputFormat.formatNames()) + "). Default: CSV").hasArg()
+                .argName("FORMAT").build());
+        o.addOption(Option.builder("s").longOpt("password").desc("Password to decrypt document. Default is empty")
+                .hasArg().argName("PASSWORD").build());
+        o.addOption(Option.builder("c").longOpt("columns")
                 .desc("X coordinates of column boundaries. Example --columns 10.1,20.2,30.3. "
                         + "If all values are between 0-100 (inclusive) and preceded by '%', input will be taken as % of actual width of the page. "
                         + "Example: --columns %25,50,80.6")
-                .hasArg()
-                .argName("COLUMNS")
-                .build());
-        o.addOption(Option.builder("a")
-                .longOpt("area")
+                .hasArg().argName("COLUMNS").build());
+        o.addOption(Option.builder("a").longOpt("area")
                 .desc("-a/--area = Portion of the page to analyze. Example: --area 269.875,12.75,790.5,561. "
                         + "Accepts top,left,bottom,right i.e. y1,x1,y2,x2 where all values are in points relative to the top left corner. "
                         + "If all values are between 0-100 (inclusive) and preceded by '%', input will be taken as % of actual height or width of the page. "
                         + "Example: --area %0,0,100,50. To specify multiple areas, -a option should be repeated. Default is entire page")
-                .hasArg()
-                .argName("AREA")
-                .build());
-        o.addOption(Option.builder("p")
-                .longOpt("pages")
-                .desc("Comma separated list of ranges, or all. Examples: --pages 1-3,5-7, --pages 3 or --pages all. Default is --pages 1")
-                .hasArg()
-                .argName("PAGES")
-                .build());
+                .hasArg().argName("AREA").build());
+        o.addOption(Option.builder("p").longOpt("pages").desc(
+                "Comma separated list of ranges, or all. Examples: --pages 1-3,5-7, --pages 3 or --pages all. Default is --pages 1")
+                .hasArg().argName("PAGES").build());
 
         return o;
     }
@@ -384,6 +380,7 @@ public class CommandLineApp {
         public void setVerticalRulingPositions(List<Float> positions) {
             this.verticalRulingPositions = positions;
         }
+
         public void setVerticalRulingPositionsRelative(boolean relative) {
             this.verticalRulingPositionsRelative = relative;
         }
@@ -403,9 +400,8 @@ public class CommandLineApp {
         public List<Table> extractTables(Page page) {
             ExtractionMethod effectiveMethod = this.method;
             if (effectiveMethod == ExtractionMethod.DECIDE) {
-                effectiveMethod = spreadsheetExtractor.isTabular(page) ?
-                        ExtractionMethod.SPREADSHEET :
-                        ExtractionMethod.BASIC;
+                effectiveMethod = spreadsheetExtractor.isTabular(page) ? ExtractionMethod.SPREADSHEET
+                        : ExtractionMethod.BASIC;
             }
             switch (effectiveMethod) {
                 case BASIC:
@@ -438,8 +434,8 @@ public class CommandLineApp {
                 if (this.verticalRulingPositionsRelative) {
                     // convert relative to absolute
                     absoluteRulingPositions = new ArrayList<>(verticalRulingPositions.size());
-                    for (float relative: this.verticalRulingPositions) {
-                        float absolute = (float)(relative / 100.0 * page.getWidth());
+                    for (float relative : this.verticalRulingPositions) {
+                        float absolute = (float) (relative / 100.0 * page.getWidth());
                         absoluteRulingPositions.add(absolute);
                     }
                 } else {
@@ -458,6 +454,7 @@ public class CommandLineApp {
     }
 
     private void writeTables(List<Table> tables, Appendable out) throws IOException {
+        // System.out.println("Got to write table method" + outputFormat);
         Writer writer = null;
         switch (outputFormat) {
             case CSV:
@@ -490,9 +487,7 @@ public class CommandLineApp {
     }
 
     private enum OutputFormat {
-        CSV,
-        TSV,
-        JSON;
+        CSV, TSV, JSON;
 
         static String[] formatNames() {
             OutputFormat[] values = OutputFormat.values();
@@ -505,9 +500,7 @@ public class CommandLineApp {
     }
 
     private enum ExtractionMethod {
-        BASIC,
-        SPREADSHEET,
-        DECIDE
+        BASIC, SPREADSHEET, DECIDE
     }
 
     private class DebugOutput {
