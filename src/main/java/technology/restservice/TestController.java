@@ -8,9 +8,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class TestController {
 
     @PostMapping("/getCroppedCSV")
-    public Controller controller(
-            @RequestParam(value = "pdfFile", defaultValue = "src/test/resources/technology/tabula/twotables.pdf") String pdfFile,
-            @RequestParam(value = "areaString", defaultValue = "%30, 0.0, 80, 100") String areaString) {
-        return new Controller(pdfFile, areaString);
+    public Controller controller(@RequestParam(value = "directory", defaultValue = "") String directory,
+            @RequestParam(value = "top", defaultValue = "30") String top,
+            @RequestParam(value = "left", defaultValue = "30") String left,
+            @RequestParam(value = "bottom", defaultValue = "100") String bottom,
+            @RequestParam(value = "right", defaultValue = "100") String right,
+            @RequestParam(value = "pages", defaultValue = "1") String pages) {
+        String areaString = top + "," + left + "," + bottom + "," + right;
+        return new Controller(directory, areaString, pages);
     }
 }

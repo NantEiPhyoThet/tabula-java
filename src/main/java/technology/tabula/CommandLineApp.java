@@ -6,6 +6,7 @@ import java.io.FilenameFilter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.cli.CommandLine;
@@ -44,9 +45,9 @@ public class CommandLineApp {
     private TableExtractor tableExtractor;
     private List<Float> verticalRulingPositions;
 
-    public CommandLineApp(Appendable defaultOutput, CommandLine line, String area) throws ParseException {
+    public CommandLineApp(Appendable defaultOutput, CommandLine line) throws ParseException {
         this.defaultOutput = defaultOutput;
-        this.pageAreas = CommandLineApp.whichAreas(area);
+        this.pageAreas = CommandLineApp.whichAreas(line);
         this.pages = CommandLineApp.whichPages(line);
         this.outputFormat = CommandLineApp.whichOutputFormat(line);
         this.tableExtractor = CommandLineApp.createExtractor(line);
@@ -76,8 +77,8 @@ public class CommandLineApp {
                 System.out.println(VERSION_STRING);
                 System.exit(0);
             }
-
-            new CommandLineApp(System.out, line, "temp").extractTables(line);
+            System.out.println("From main args: " + Arrays.toString(args));
+            new CommandLineApp(System.out, line).extractTables(line);
         } catch (ParseException exp) {
             System.err.println("Error: " + exp.getMessage());
             System.exit(1);
@@ -103,13 +104,11 @@ public class CommandLineApp {
             throw new ParseException("Need exactly one filename\nTry --help for help");
         }
 
-        String pdfFileParam = line.getArgs()[0].split("\\s+")[1];
-        // File pdfFile = new File(line.getArgs()[0]);
-        File pdfFile = new File(pdfFileParam);
-        // System.out.println("CHECKING LINE ARGS" + pdfFileParam);
-        File pdfFile1 = new File("src/test/resources/technology/tabula/twotables.pdf");
-        // System.out.println("Getting file from args"+pdfFile1.getName());
-        if (!pdfFile1.exists()) {
+        // String pdfFileParam = line.getArgs()[0].split("\\s+")[1];
+        // File pdfFile = new File(pdfFileParam);
+
+        File pdfFile = new File(line.getArgs()[0]);
+        if (!pdfFile.exists()) {
             throw new ParseException("File does not exist");
         }
         extractFileTables(line, pdfFile);
@@ -162,14 +161,11 @@ public class CommandLineApp {
     private void extractFile(File pdfFile, Appendable outFile) throws ParseException {
         PDDocument pdfDocument = null;
         try {
-            System.out.println("Inside extract file" + pdfFile.getName());
             pdfDocument = this.password == null ? PDDocument.load(pdfFile) : PDDocument.load(pdfFile, this.password);
             PageIterator pageIterator = getPageIterator(pdfDocument);
             List<Table> tables = new ArrayList<>();
 
             while (pageIterator.hasNext()) {
-                System.out.println("Inside page iterator while loop");
-
                 Page page = pageIterator.next();
 
                 if (verticalRulingPositions != null) {
@@ -179,11 +175,10 @@ public class CommandLineApp {
                 }
 
                 if (pageAreas != null) {
-                    // System.out.println("Page area is NOT null");
+                    // System.out.println("Page area is NOT null" + pageAreas);
                     for (Pair<Integer, Rectangle> areaPair : pageAreas) {
                         Rectangle area = areaPair.getRight();
                         if (areaPair.getLeft() == RELATIVE_AREA_CALCULATION_MODE) {
-                            // System.out.println("From get left RELATIVE_AREA_CALCULATION_MODE");
                             area = new Rectangle((float) (area.getTop() / 100 * page.getHeight()),
                                     (float) (area.getLeft() / 100 * page.getWidth()),
                                     (float) (area.getWidth() / 100 * page.getWidth()),
@@ -231,25 +226,37 @@ public class CommandLineApp {
         }
     }
 
-    private static List<Pair<Integer, Rectangle>> whichAreas(String line) throws ParseException {
-        // System.out.println("Inside which area has the option a");
-        // if (!line.hasOption("a")) {
-        // System.out.println("no option a");
-        // return null;
-        // }
+    private static List<Pair<Integer, Rectangle>> whichAreas(CommandLine line) throws ParseException {
+        if (!line.hasOption("a")) {
+            return null;
+        }
 
-        String[] optionValues = new String[] { line };
-        // String[] optionValues = line.getOptionValues('a');
+        // String[] optionValues = new String[] { line };
+        String[] optionValues = line.getOptionValues('a');
 
         List<Pair<Integer, Rectangle>> areaList = new ArrayList<Pair<Integer, Rectangle>>();
         for (String optionValue : optionValues) {
-            int areaCalculationMode = ABSOLUTE_AREA_CALCULATION_MODE;
+
+            // ********************
+            // Only works in this format % 10,0,30,100, i.e, areaCalculationMode ==
+            // RELATIVE_AREA_CALCULATION_MODE
+            // ********************
+
+            // **** Master Code ****/
+            // int areaCalculationMode = ABSOLUTE_AREA_CALCULATION_MODE;
+            // int startIndex = 0;
+            // if (optionValue.startsWith("%")) {
+            // System.out.println("Option value starts with %");
+            // startIndex = 1;
+            // areaCalculationMode = RELATIVE_AREA_CALCULATION_MODE;
+            // }
+
+            int areaCalculationMode = RELATIVE_AREA_CALCULATION_MODE;
             int startIndex = 0;
             if (optionValue.startsWith("%")) {
-                System.out.println("Option value starts with %");
                 startIndex = 1;
-                areaCalculationMode = RELATIVE_AREA_CALCULATION_MODE;
             }
+
             List<Float> f = parseFloatList(optionValue.substring(startIndex));
 
             if (f.size() != 4) {

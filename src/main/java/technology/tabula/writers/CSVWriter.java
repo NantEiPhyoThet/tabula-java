@@ -32,17 +32,17 @@ public class CSVWriter implements Writer {
 	@Override
 	public void write(Appendable out, List<Table> tables) throws IOException {
 		try (CSVPrinter printer = new CSVPrinter(out, format)) {
-			String result = "";
+			ArrayList<List> result = new ArrayList<List>();
 			for (Table table : tables) {
 				for (List<RectangularTextContainer> row : table.getRows()) {
 					List<String> cells = new ArrayList<>(row.size());
 					for (RectangularTextContainer<?> tc : row)
 						cells.add(tc.getText());
 					printer.printRecord(cells);
-					result = result.concat(cells.toString());
+					result.add(cells);
 				}
 				// System.out.println("From csv writer write" + result);
-				new Controller().setResult(result);
+				Controller.setResult(result);
 			}
 			printer.flush();
 		}
